@@ -1,4 +1,4 @@
-package com.pigeonmq.model;
+package com.pigeonmq.domain;
 
 public enum DestinationType {
     TOPIC,

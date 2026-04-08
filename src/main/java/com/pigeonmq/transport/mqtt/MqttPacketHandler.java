@@ -1,9 +1,7 @@
 package com.pigeonmq.transport.mqtt;
 
-import com.pigeonmq.core.Broker;
-import com.pigeonmq.core.ClientSession;
-import com.pigeonmq.model.DestinationType;
-import io.netty.buffer.ByteBuf;
+import com.pigeonmq.domain.ClientSession;
+import com.pigeonmq.service.BrokerFacade;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;
@@ -11,24 +9,23 @@ import io.netty.handler.timeout.IdleStateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class MqttPacketHandler extends SimpleChannelInboundHandler<MqttMessage> {
 
     private static final Logger log = LoggerFactory.getLogger(MqttPacketHandler.class);
 
-    private final Broker broker;
+    private final BrokerFacade brokerFacade;
     private ClientSession session;
 
-    public MqttPacketHandler(Broker broker) {
-        this.broker = broker;
+    public MqttPacketHandler(BrokerFacade brokerFacade) {
+        this.brokerFacade = brokerFacade;
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MqttMessage msg) {
         if (msg.decoderResult().isFailure()) {
-            log.warn("Bad MQTT packet, closing connection");
+            log.warn("Malformed MQTT packet from {}", ctx.channel().remoteAddress());
             ctx.close();
             return;
         }
@@ -36,16 +33,14 @@ public class MqttPacketHandler extends SimpleChannelInboundHandler<MqttMessage> 
         switch (msg.fixedHeader().messageType()) {
             case CONNECT     -> handleConnect(ctx, (MqttConnectMessage) msg);
             case PUBLISH     -> handlePublish(ctx, (MqttPublishMessage) msg);
-            case PUBACK      -> handlePubAck(msg);
+            case PUBACK      -> handlePuback(msg);
             case SUBSCRIBE   -> handleSubscribe(ctx, (MqttSubscribeMessage) msg);
             case UNSUBSCRIBE -> handleUnsubscribe(ctx, (MqttUnsubscribeMessage) msg);
-            case PINGREQ     -> handlePingReq(ctx);
+            case PINGREQ     -> handlePing(ctx);
             case DISCONNECT  -> handleDisconnect(ctx);
-            default -> log.debug("Unhandled MQTT packet type: {}", msg.fixedHeader().messageType());
+            default          -> log.debug("Unhandled MQTT type: {}", msg.fixedHeader().messageType());
         }
     }
-
-    /* ═══════════════ CONNECT ═══════════════ */
 
     private void handleConnect(ChannelHandlerContext ctx, MqttConnectMessage msg) {
         String clientId = msg.payload().clientIdentifier();
@@ -53,153 +48,103 @@ public class MqttPacketHandler extends SimpleChannelInboundHandler<MqttMessage> 
             clientId = "anon-" + ctx.channel().id().asShortText();
         }
 
-        session = broker.registerClient(clientId, ctx.channel());
+        session = brokerFacade.registerClient(clientId, ctx.channel());
 
-        MqttConnAckMessage connAck = MqttMessageBuilders.connAck()
+        MqttConnAckMessage ack = MqttMessageBuilders.connAck()
                 .returnCode(MqttConnectReturnCode.CONNECTION_ACCEPTED)
                 .sessionPresent(false)
                 .build();
-        ctx.writeAndFlush(connAck);
-        log.debug("CONNACK → {}", clientId);
+        ctx.writeAndFlush(ack);
     }
-
-    /* ═══════════════ PUBLISH (from publisher) ═══════════════ */
 
     private void handlePublish(ChannelHandlerContext ctx, MqttPublishMessage msg) {
-        requireSession(ctx);
-        if (session == null) return;
+        if (!ensureSession(ctx)) return;
 
-        String topicName = msg.variableHeader().topicName();
-        int packetId = msg.variableHeader().packetId();
-        MqttQoS qos = msg.fixedHeader().qosLevel();
+        String destination = msg.variableHeader().topicName();
+        byte[] payload = new byte[msg.payload().readableBytes()];
+        msg.payload().readBytes(payload);
 
-        ByteBuf payloadBuf = msg.payload();
-        byte[] payload = new byte[payloadBuf.readableBytes()];
-        payloadBuf.readBytes(payload);
+        brokerFacade.publish(destination, payload, 0);
 
-        broker.publish(topicName, payload, null, 0);
-
-        if (qos == MqttQoS.AT_LEAST_ONCE && packetId > 0) {
-            MqttMessage pubAck = MqttMessageBuilders.pubAck()
-                    .packetId(packetId)
+        if (msg.fixedHeader().qosLevel() == MqttQoS.AT_LEAST_ONCE) {
+            MqttMessage ack = MqttMessageBuilders.pubAck()
+                    .packetId(msg.variableHeader().packetId())
                     .build();
-            ctx.writeAndFlush(pubAck);
-            log.debug("PUBACK → {} (pktId={})", session.getClientId(), packetId);
+            ctx.writeAndFlush(ack);
         }
     }
 
-    /* ═══════════════ PUBACK (from subscriber, delivery ACK) ═══════════════ */
-
-    private void handlePubAck(MqttMessage msg) {
+    private void handlePuback(MqttMessage msg) {
         if (session == null) return;
-        int packetId = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        broker.acknowledgeDelivery(session, packetId);
+        MqttMessageIdVariableHeader header = (MqttMessageIdVariableHeader) msg.variableHeader();
+        brokerFacade.acknowledgeDelivery(session, header.messageId());
     }
-
-    /* ═══════════════ SUBSCRIBE ═══════════════ */
 
     private void handleSubscribe(ChannelHandlerContext ctx, MqttSubscribeMessage msg) {
-        requireSession(ctx);
-        if (session == null) return;
+        if (!ensureSession(ctx)) return;
 
-        int packetId = msg.variableHeader().messageId();
         List<MqttTopicSubscription> subs = msg.payload().topicSubscriptions();
-        List<Integer> grantedQos = new ArrayList<>();
-
         for (MqttTopicSubscription sub : subs) {
-            String filter = sub.topicName();
-
-            if (filter.startsWith("$share/")) {
-                String[] parts = filter.split("/", 3);
-                if (parts.length == 3) {
-                    broker.subscribe(session, parts[2], DestinationType.QUEUE);
-                    grantedQos.add(MqttQoS.AT_LEAST_ONCE.value());
-                } else {
-                    grantedQos.add(MqttQoS.FAILURE.value());
-                }
-            } else {
-                broker.subscribe(session, filter, DestinationType.TOPIC);
-                grantedQos.add(MqttQoS.AT_LEAST_ONCE.value());
-            }
+            brokerFacade.subscribe(session, sub.topicName());
         }
 
-        MqttFixedHeader fixedHeader = new MqttFixedHeader(
-                MqttMessageType.SUBACK, false, MqttQoS.AT_MOST_ONCE, false, 0);
-        MqttMessageIdVariableHeader varHeader = MqttMessageIdVariableHeader.from(packetId);
-        MqttSubAckPayload payload = new MqttSubAckPayload(grantedQos);
-        ctx.writeAndFlush(new MqttSubAckMessage(fixedHeader, varHeader, payload));
-        log.debug("SUBACK → {} (pktId={}, subs={})", session.getClientId(), packetId, subs.size());
+        MqttSubAckMessage subAck = MqttMessageBuilders.subAck()
+                .packetId(msg.variableHeader().messageId())
+                .addGrantedQoses(subs.stream()
+                        .map(s -> MqttQoS.AT_LEAST_ONCE)
+                        .toArray(MqttQoS[]::new))
+                .build();
+        ctx.writeAndFlush(subAck);
     }
-
-    /* ═══════════════ UNSUBSCRIBE ═══════════════ */
 
     private void handleUnsubscribe(ChannelHandlerContext ctx, MqttUnsubscribeMessage msg) {
-        requireSession(ctx);
-        if (session == null) return;
+        if (!ensureSession(ctx)) return;
 
-        int packetId = msg.variableHeader().messageId();
-        for (String filter : msg.payload().topics()) {
-            if (filter.startsWith("$share/")) {
-                String[] parts = filter.split("/", 3);
-                if (parts.length == 3) session.unsubscribeQueue(parts[2]);
-            } else {
-                session.unsubscribeTopic(filter);
-            }
+        for (String topicFilter : msg.payload().topics()) {
+            brokerFacade.unsubscribe(session, topicFilter);
         }
 
-        MqttFixedHeader fixedHeader = new MqttFixedHeader(
-                MqttMessageType.UNSUBACK, false, MqttQoS.AT_MOST_ONCE, false, 0);
-        ctx.writeAndFlush(new MqttMessage(fixedHeader, MqttMessageIdVariableHeader.from(packetId)));
-        log.debug("UNSUBACK → {} (pktId={})", session.getClientId(), packetId);
+        MqttUnsubAckMessage unsubAck = MqttMessageBuilders.unsubAck()
+                .packetId(msg.variableHeader().messageId())
+                .build();
+        ctx.writeAndFlush(unsubAck);
     }
 
-    /* ═══════════════ PING ═══════════════ */
-
-    private void handlePingReq(ChannelHandlerContext ctx) {
+    private void handlePing(ChannelHandlerContext ctx) {
         MqttFixedHeader fixedHeader = new MqttFixedHeader(
                 MqttMessageType.PINGRESP, false, MqttQoS.AT_MOST_ONCE, false, 0);
         ctx.writeAndFlush(new MqttMessage(fixedHeader));
     }
 
-    /* ═══════════════ DISCONNECT ═══════════════ */
-
     private void handleDisconnect(ChannelHandlerContext ctx) {
-        if (session != null) {
-            log.debug("DISCONNECT ← {}", session.getClientId());
-            broker.removeClient(session.getClientId());
-            session = null;
-        }
+        brokerFacade.removeClient(ctx.channel());
         ctx.close();
     }
 
-    /* ═══════════════ Lifecycle ═══════════════ */
-
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        if (session != null) {
-            broker.removeClient(session.getClientId());
-            session = null;
-        }
+        brokerFacade.removeClient(ctx.channel());
     }
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof IdleStateEvent) {
-            log.debug("Idle timeout, closing {}", session != null ? session.getClientId() : ctx.channel());
             ctx.close();
         }
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.error("Channel error ({}): {}", session != null ? session.getClientId() : "unknown", cause.getMessage());
+        log.error("Channel error [{}]: {}", ctx.channel().remoteAddress(), cause.getMessage());
         ctx.close();
     }
 
-    private void requireSession(ChannelHandlerContext ctx) {
-        if (session == null) {
-            log.warn("Packet before CONNECT, closing");
-            ctx.close();
+    private boolean ensureSession(ChannelHandlerContext ctx) {
+        if (session != null) {
+            return true;
         }
+        log.warn("Packet before CONNECT from {}", ctx.channel().remoteAddress());
+        ctx.close();
+        return false;
     }
 }

@@ -1,0 +1,20 @@
+server:
+  port: ${PIGEONMQ_HTTP_PORT:8080}
+
+pigeonmq:
+  mqtt-port: ${PIGEONMQ_MQTT_PORT:1883}
+  delivery-interval-ms: ${PIGEONMQ_DELIVERY_INTERVAL_MS:100}
+  ack-timeout-seconds: ${PIGEONMQ_ACK_TIMEOUT_SECONDS:30}
+  max-retries: ${PIGEONMQ_MAX_RETRIES:5}
+  worker-pool-size: ${PIGEONMQ_WORKER_POOL_SIZE:4}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui
+
+logging:
+  level:
+    com.pigeonmq: DEBUG
+    io.netty: INFO

@@ -1,6 +1,5 @@
-package com.pigeonmq.core;
+package com.pigeonmq.domain;
 
-import com.pigeonmq.model.PendingDelivery;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.mqtt.MqttMessageBuilders;
@@ -14,6 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ClientSession {
 
+    private static final int MAX_PACKET_ID = 65_535;
+
     private final String clientId;
     private final Channel channel;
     private final AtomicInteger packetIdSeq = new AtomicInteger(1);
@@ -21,7 +22,6 @@ public class ClientSession {
     private final Map<Integer, PendingDelivery> pendingDeliveries = new ConcurrentHashMap<>();
     private final Set<String> subscribedTopics = ConcurrentHashMap.newKeySet();
     private final Set<String> subscribedQueues = ConcurrentHashMap.newKeySet();
-
     private final Map<String, Long> topicSentOffsets = new ConcurrentHashMap<>();
 
     public ClientSession(String clientId, Channel channel) {
@@ -29,9 +29,9 @@ public class ClientSession {
         this.channel = channel;
     }
 
-    public String getClientId() { return clientId; }
-    public Channel getChannel() { return channel; }
-    public boolean isActive() { return channel != null && channel.isActive(); }
+    public String getClientId()           { return clientId; }
+    public Channel getChannel()           { return channel; }
+    public boolean isActive()             { return channel != null && channel.isActive(); }
     public Set<String> getSubscribedTopics() { return subscribedTopics; }
     public Set<String> getSubscribedQueues() { return subscribedQueues; }
 
@@ -62,7 +62,7 @@ public class ClientSession {
     }
 
     public int nextPacketId() {
-        return packetIdSeq.getAndUpdate(i -> (i % 65_535) + 1);
+        return packetIdSeq.getAndUpdate(i -> (i % MAX_PACKET_ID) + 1);
     }
 
     public void trackDelivery(int packetId, PendingDelivery delivery) {

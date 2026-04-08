@@ -1,57 +1,95 @@
-### Health
+### ────────────────────────────────────────────
+### pigeonMQ REST API — IntelliJ HTTP Client
+### Swagger UI: http://localhost:8080/swagger-ui
+### OpenAPI:    http://localhost:8080/api-docs
+### ────────────────────────────────────────────
+
+
+### ═══════════════ HEALTH ═══════════════
+
+### Health check
 GET http://localhost:8080/health
 Accept: application/json
 
-###
-### Create topic
+
+### ═══════════════ TOPICS ═══════════════
+
+### Create topic "orders"
 POST http://localhost:8080/api/topics
 Content-Type: application/json
 Accept: application/json
 
-{"name":"orders"}
+{"name": "orders"}
 
-###
-### List topics
+### Create topic "notifications"
+POST http://localhost:8080/api/topics
+Content-Type: application/json
+Accept: application/json
+
+{"name": "notifications"}
+
+### List all topics
 GET http://localhost:8080/api/topics
 Accept: application/json
 
-###
-### Topic details
+### Get topic details
 GET http://localhost:8080/api/topics/orders
 Accept: application/json
 
-###
 ### Delete topic
-DELETE http://localhost:8080/api/topics/orders
+DELETE http://localhost:8080/api/topics/notifications
 Accept: application/json
 
-###
-### Create queue (FIFO)
+
+### ═══════════════ QUEUES ═══════════════
+
+### Create FIFO queue "emails"
 POST http://localhost:8080/api/queues
 Content-Type: application/json
 Accept: application/json
 
-{"name":"tasks","mode":"FIFO"}
+{"name": "emails", "mode": "FIFO"}
 
-###
-### Create queue (PRIORITY)
+### Create PRIORITY queue "tasks"
 POST http://localhost:8080/api/queues
 Content-Type: application/json
 Accept: application/json
 
-{"name":"tasks_priority","mode":"PRIORITY"}
+{"name": "tasks", "mode": "PRIORITY"}
 
-###
-### List queues
+### List all queues
 GET http://localhost:8080/api/queues
 Accept: application/json
 
-###
-### Queue details
-GET http://localhost:8080/api/queues/tasks
+### Get queue details
+GET http://localhost:8080/api/queues/emails
 Accept: application/json
 
-###
 ### Delete queue
 DELETE http://localhost:8080/api/queues/tasks
+Accept: application/json
+
+
+### ═══════════════ VALIDATION / ERRORS ═══════════════
+
+### 404: Get non-existent topic
+GET http://localhost:8080/api/topics/nonexistent
+Accept: application/json
+
+### 400: Create topic with blank name
+POST http://localhost:8080/api/topics
+Content-Type: application/json
+Accept: application/json
+
+{"name": ""}
+
+### 400: Create queue with invalid mode
+POST http://localhost:8080/api/queues
+Content-Type: application/json
+Accept: application/json
+
+{"name": "test", "mode": "LIFO"}
+
+### 404: Delete non-existent queue
+DELETE http://localhost:8080/api/queues/nonexistent
 Accept: application/json

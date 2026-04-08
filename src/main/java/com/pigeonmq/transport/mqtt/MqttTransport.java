@@ -1,7 +1,7 @@
 package com.pigeonmq.transport.mqtt;
 
-import com.pigeonmq.config.BrokerConfig;
-import com.pigeonmq.core.Broker;
+import com.pigeonmq.config.BrokerProperties;
+import com.pigeonmq.service.BrokerFacade;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
@@ -10,46 +10,73 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.stereotype.Component;
 
-public class MqttTransport {
+@Component
+public class MqttTransport implements SmartLifecycle {
 
     private static final Logger log = LoggerFactory.getLogger(MqttTransport.class);
+    private static final int BACKLOG = 128;
 
-    private final BrokerConfig config;
-    private final Broker broker;
+    private final BrokerProperties properties;
+    private final BrokerFacade brokerFacade;
+
+    private volatile boolean running;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
 
-    public MqttTransport(BrokerConfig config, Broker broker) {
-        this.config = config;
-        this.broker = broker;
+    public MqttTransport(BrokerProperties properties, BrokerFacade brokerFacade) {
+        this.properties = properties;
+        this.brokerFacade = brokerFacade;
     }
 
-    public void start() throws InterruptedException {
+    @Override
+    public void start() {
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
 
-        ServerBootstrap bootstrap = new ServerBootstrap()
-                .group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .childHandler(new MqttChannelInitializer(broker))
-                .option(ChannelOption.SO_BACKLOG, 128)
-                .childOption(ChannelOption.SO_KEEPALIVE, true)
-                .childOption(ChannelOption.TCP_NODELAY, true);
+        try {
+            ServerBootstrap bootstrap = new ServerBootstrap()
+                    .group(bossGroup, workerGroup)
+                    .channel(NioServerSocketChannel.class)
+                    .childHandler(new MqttChannelInitializer(brokerFacade))
+                    .option(ChannelOption.SO_BACKLOG, BACKLOG)
+                    .childOption(ChannelOption.SO_KEEPALIVE, true)
+                    .childOption(ChannelOption.TCP_NODELAY, true);
 
-        serverChannel = bootstrap.bind(config.getMqttPort()).sync().channel();
-        log.info("MQTT server listening on port {}", config.getMqttPort());
+            serverChannel = bootstrap.bind(properties.getMqttPort()).sync().channel();
+            running = true;
+            log.info("MQTT transport listening on port {}", properties.getMqttPort());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("MQTT transport failed to start", e);
+        }
     }
 
+    @Override
     public void stop() {
-        if (serverChannel != null) serverChannel.close();
-        if (workerGroup != null) workerGroup.shutdownGracefully();
-        if (bossGroup != null) bossGroup.shutdownGracefully();
-        log.info("MQTT server stopped");
+        running = false;
+        if (serverChannel != null) {
+            serverChannel.close().syncUninterruptibly();
+        }
+        if (workerGroup != null) {
+            workerGroup.shutdownGracefully();
+        }
+        if (bossGroup != null) {
+            bossGroup.shutdownGracefully();
+        }
+        log.info("MQTT transport stopped");
     }
 
-    public void awaitTermination() throws InterruptedException {
-        if (serverChannel != null) serverChannel.closeFuture().sync();
+    @Override
+    public boolean isRunning() {
+        return running;
+    }
+
+    @Override
+    public int getPhase() {
+        return Integer.MAX_VALUE;
     }
 }
