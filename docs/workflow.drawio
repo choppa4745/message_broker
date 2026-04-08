@@ -1,0 +1,383 @@
+<mxfile host="app.diagrams.net" modified="2026-03-23T00:00:00.000Z" agent="pigeonMQ" version="22.1.3" type="device">
+  <diagram id="workflow" name="pigeonMQ — Детальный процесс работы">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="2400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ═══════════════ TITLE ═══════════════ -->
+        <mxCell id="title" value="pigeonMQ — Полный процесс работы брокера" style="text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="10" width="600" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════ SWIMLANE: PUBLISHER ═══════════════ -->
+        <mxCell id="sw_pub" value="Publisher (Java SDK)" style="shape=swimlane;startSize=25;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=12;horizontal=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="70" width="280" height="2300" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="p01" value="Запуск SDK&#10;PigeonClient.connect(host, port)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;" vertex="1" parent="sw_pub">
+          <mxGeometry x="30" y="40" width="220" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p02" value="MQTT CONNECT&#10;clientId, keepAlive&#10;→ broker" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;" vertex="1" parent="sw_pub">
+          <mxGeometry x="30" y="110" width="220" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="p03" value="CONNACK ← broker&#10;(session established)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#388e3c;" vertex="1" parent="sw_pub">
+          <mxGeometry x="30" y="185" width="220" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="p04" value="Формирование сообщения:&#10;topic = &quot;orders&quot;&#10;payload = { order: ... }&#10;QoS = 1&#10;userProps: x-ttl = 300,&#10;x-priority = 5, x-h-source = web" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;align=left;spacingLeft=8;" vertex="1" parent="sw_pub">
+          <mxGeometry x="15" y="260" width="250" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="p05" value="MQTT PUBLISH&#10;(QoS 1, packetId=42)&#10;→ broker" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;" vertex="1" parent="sw_pub">
+          <mxGeometry x="30" y="390" width="220" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="p06" value="PUBACK ← broker&#10;(packetId=42)&#10;→ гарантия: сохранено" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#388e3c;" vertex="1" parent="sw_pub">
+          <mxGeometry x="30" y="690" width="220" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- publisher edges -->
+        <mxCell id="pe1" style="endArrow=block;strokeColor=#1565c0;" edge="1" parent="sw_pub" source="p01" target="p02"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe2" style="endArrow=block;strokeColor=#388e3c;" edge="1" parent="sw_pub" source="p02" target="p03"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe3" style="endArrow=block;strokeColor=#1565c0;" edge="1" parent="sw_pub" source="p03" target="p04"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe4" style="endArrow=block;strokeColor=#1565c0;" edge="1" parent="sw_pub" source="p04" target="p05"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ═══════════════ SWIMLANE: BROKER ═══════════════ -->
+        <mxCell id="sw_broker" value="pigeonMQ Broker" style="shape=swimlane;startSize=25;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=12;horizontal=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="70" width="600" height="2300" as="geometry"/>
+        </mxCell>
+
+        <!-- CONNECT handling -->
+        <mxCell id="b01" value="MqttServer: принимает TCP-соединение&#10;ExecutorService выделяет поток&#10;для обработки клиента" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="sw_broker">
+          <mxGeometry x="30" y="40" width="310" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="b02" value="Декодирование MQTT CONNECT packet&#10;→ валидация clientId, protocol version" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="sw_broker">
+          <mxGeometry x="30" y="120" width="310" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="b03" value="Subscription Manager:&#10;регистрирует clientSession&#10;в in-memory map + БД" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;" vertex="1" parent="sw_broker">
+          <mxGeometry x="30" y="190" width="310" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="b04" value="Отправка CONNACK&#10;returnCode=0 (accepted)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="sw_broker">
+          <mxGeometry x="30" y="260" width="310" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- PUBLISH handling -->
+        <mxCell id="b_recv_pub" value="MqttServer: принимает MQTT PUBLISH&#10;packet → парсит topic, payload,&#10;QoS, user properties" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="sw_broker">
+          <mxGeometry x="30" y="380" width="310" height="65" as="geometry"/>
+        </mxCell>
+
+        <!-- Decision: TOPIC vs QUEUE -->
+        <mxCell id="b_decision" value="Message Router:&#10;destination = TOPIC&#10;или QUEUE?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;fontSize=11;" vertex="1" parent="sw_broker">
+          <mxGeometry x="90" y="480" width="200" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- TOPIC BRANCH -->
+        <mxCell id="t_title" value="TOPIC BRANCH (fan-out)" style="text;html=1;align=center;fontStyle=5;fontSize=11;fontColor=#1565c0;" vertex="1" parent="sw_broker">
+          <mxGeometry x="10" y="605" width="200" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="t01" value="Topic Manager:&#10;1. BEGIN TRANSACTION&#10;2. topics.next_offset++&#10;3. INSERT topic_messages&#10;   (offset, msg_id, payload,&#10;    headers, expires_at)&#10;4. COMMIT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;align=left;spacingLeft=8;" vertex="1" parent="sw_broker">
+          <mxGeometry x="10" y="630" width="230" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="t02" value="Delivery Manager:&#10;SELECT s FROM subscriptions&#10;WHERE dest_type='TOPIC'&#10;AND destination_name='orders'" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;align=left;spacingLeft=8;" vertex="1" parent="sw_broker">
+          <mxGeometry x="10" y="780" width="250" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="t03" value="Для КАЖДОГО subscriber:&#10;1. SELECT msg WHERE&#10;   offset > consumer_offset&#10;   AND (expires_at IS NULL&#10;        OR expires_at > now())&#10;2. INSERT topic_delivery_state&#10;   (state=INFLIGHT,&#10;    ack_deadline=now()+30s)&#10;3. Outbound PUBLISH (QoS 1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_broker">
+          <mxGeometry x="10" y="870" width="260" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="t04" value="PUBACK от subscriber →&#10;UPDATE topic_delivery_state&#10;SET state='ACKED'&#10;UPDATE subscriptions&#10;SET consumer_offset = offset" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_broker">
+          <mxGeometry x="10" y="1030" width="260" height="85" as="geometry"/>
+        </mxCell>
+
+        <!-- QUEUE BRANCH -->
+        <mxCell id="q_title" value="QUEUE BRANCH (competing consumers)" style="text;html=1;align=center;fontStyle=5;fontSize=11;fontColor=#c62828;" vertex="1" parent="sw_broker">
+          <mxGeometry x="290" y="605" width="280" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="q01" value="Queue Manager:&#10;1. BEGIN TRANSACTION&#10;2. queues.next_offset++&#10;3. INSERT queue_messages&#10;   (offset, msg_id, payload,&#10;    priority, headers, expires_at)&#10;4. COMMIT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;align=left;spacingLeft=8;" vertex="1" parent="sw_broker">
+          <mxGeometry x="310" y="630" width="240" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="q02" value="Delivery Manager → claim:&#10;BEGIN TRANSACTION&#10;SELECT qm.* FROM queue_messages qm&#10;LEFT JOIN queue_delivery_state qds&#10;  ON qm.message_id = qds.message_id&#10;WHERE qds IS NULL  -- ещё не claimed&#10;  AND (expires_at IS NULL&#10;       OR expires_at &gt; now())&#10;ORDER BY priority DESC, offset ASC&#10;LIMIT 1&#10;FOR UPDATE SKIP LOCKED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_broker">
+          <mxGeometry x="290" y="780" width="290" height="165" as="geometry"/>
+        </mxCell>
+        <mxCell id="q03" value="INSERT queue_delivery_state&#10;(message_id, consumer_id,&#10; state='INFLIGHT',&#10; ack_deadline = now() + 30s,&#10; retry_count = 0)&#10;COMMIT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#e65100;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_broker">
+          <mxGeometry x="310" y="970" width="250" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="q04" value="Outbound PUBLISH (QoS 1)&#10;→ одному subscriber&#10;из shared subscription" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="sw_broker">
+          <mxGeometry x="310" y="1090" width="250" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="q05" value="PUBACK от subscriber →&#10;UPDATE queue_delivery_state&#10;SET state = 'ACKED'" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_broker">
+          <mxGeometry x="310" y="1170" width="250" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- PUBACK to publisher -->
+        <mxCell id="b_puback" value="Broker → Publisher:&#10;PUBACK (packetId=42)&#10;сообщение успешно сохранено" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="sw_broker">
+          <mxGeometry x="100" y="1270" width="250" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════ RETRY / DLQ section ═══════════════ -->
+        <mxCell id="retry_title" value="RETRY / DLQ FLOW (Background Workers)" style="text;html=1;align=center;fontStyle=5;fontSize=13;fontColor=#c62828;" vertex="1" parent="sw_broker">
+          <mxGeometry x="100" y="1370" width="350" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="r01" value="Retry Worker (каждые N секунд):&#10;SELECT * FROM queue_delivery_state&#10;WHERE state = 'INFLIGHT'&#10;  AND ack_deadline &lt;= now()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;align=left;spacingLeft=8;fontSize=11;" vertex="1" parent="sw_broker">
+          <mxGeometry x="30" y="1410" width="320" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="r_dec" value="retry_count&#10;&lt; max_retries?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;" vertex="1" parent="sw_broker">
+          <mxGeometry x="100" y="1510" width="170" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="r_yes" value="ДА: retry&#10;1. DELETE queue_delivery_state&#10;   WHERE message_id = ?&#10;   (сообщение снова «READY»)&#10;2. Delivery Manager подхватит&#10;   → claim с retry_count+1&#10;   → exponential backoff delay" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_broker">
+          <mxGeometry x="10" y="1640" width="240" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="r_no" value="НЕТ: → DLQ&#10;1. INSERT dlq_messages&#10;   (message_id, dest_type,&#10;    destination_name, payload,&#10;    retry_count, reason)&#10;2. DELETE queue_delivery_state&#10;3. Логирование + метрика" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_broker">
+          <mxGeometry x="310" y="1640" width="250" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- TTL reaper -->
+        <mxCell id="ttl_title" value="TTL REAPER (Background Worker)" style="text;html=1;align=center;fontStyle=5;fontSize=13;fontColor=#e65100;" vertex="1" parent="sw_broker">
+          <mxGeometry x="100" y="1810" width="300" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="ttl01" value="TTL Reaper (каждые 60 секунд):&#10;DELETE FROM topic_messages&#10;WHERE expires_at IS NOT NULL&#10;  AND expires_at &lt;= now()&#10;&#10;DELETE FROM queue_messages qm&#10;WHERE expires_at IS NOT NULL&#10;  AND expires_at &lt;= now()&#10;  AND NOT EXISTS (&#10;    SELECT 1 FROM queue_delivery_state&#10;    WHERE message_id = qm.message_id&#10;      AND state = 'INFLIGHT'&#10;  )" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#e65100;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_broker">
+          <mxGeometry x="60" y="1850" width="340" height="175" as="geometry"/>
+        </mxCell>
+
+        <!-- RECOVERY on restart -->
+        <mxCell id="rec_title" value="RECOVERY (при перезапуске брокера)" style="text;html=1;align=center;fontStyle=5;fontSize=13;fontColor=#6a1b9a;" vertex="1" parent="sw_broker">
+          <mxGeometry x="100" y="2060" width="300" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="rec01" value="1. Загрузка topics, queues из БД → in-memory registry&#10;2. Загрузка subscriptions → восстановление consumer_offset&#10;3. queue_delivery_state WHERE state='INFLIGHT'&#10;   AND ack_deadline &lt;= now()&#10;   → возврат в READY (retry)&#10;4. Запуск Delivery Manager → resumed delivery&#10;5. Запуск Background Workers → retry/TTL resumed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#283593;align=left;spacingLeft=10;fontSize=11;" vertex="1" parent="sw_broker">
+          <mxGeometry x="30" y="2100" width="430" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- broker internal edges -->
+        <mxCell id="be1" style="endArrow=block;strokeColor=#0288d1;" edge="1" parent="sw_broker" source="b01" target="b02"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="be2" style="endArrow=block;strokeColor=#2e7d32;" edge="1" parent="sw_broker" source="b02" target="b03"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="be3" style="endArrow=block;strokeColor=#0288d1;" edge="1" parent="sw_broker" source="b03" target="b04"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="be_pub" style="endArrow=block;strokeColor=#0288d1;" edge="1" parent="sw_broker" source="b04" target="b_recv_pub"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="be_dec" style="endArrow=block;strokeColor=#f9a825;" edge="1" parent="sw_broker" source="b_recv_pub" target="b_decision"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="be_topic" value="TOPIC" style="endArrow=block;strokeColor=#1565c0;" edge="1" parent="sw_broker" source="b_decision" target="t01">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="580"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="be_queue" value="QUEUE" style="endArrow=block;strokeColor=#c62828;" edge="1" parent="sw_broker" source="b_decision" target="q01">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="480" y="580"/></Array></mxGeometry>
+        </mxCell>
+
+        <!-- topic flow edges -->
+        <mxCell id="te1" style="endArrow=block;strokeColor=#2e7d32;" edge="1" parent="sw_broker" source="t01" target="t02"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="te2" style="endArrow=block;strokeColor=#f9a825;" edge="1" parent="sw_broker" source="t02" target="t03"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="te3" style="endArrow=block;strokeColor=#2e7d32;" edge="1" parent="sw_broker" source="t03" target="t04"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- queue flow edges -->
+        <mxCell id="qe1" style="endArrow=block;strokeColor=#2e7d32;" edge="1" parent="sw_broker" source="q01" target="q02"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe2" style="endArrow=block;strokeColor=#e65100;" edge="1" parent="sw_broker" source="q02" target="q03"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe3" style="endArrow=block;strokeColor=#0288d1;" edge="1" parent="sw_broker" source="q03" target="q04"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe4" style="endArrow=block;strokeColor=#2e7d32;" edge="1" parent="sw_broker" source="q04" target="q05"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- converge to PUBACK -->
+        <mxCell id="conv1" style="endArrow=block;strokeColor=#0288d1;dashed=1;" edge="1" parent="sw_broker" source="t01" target="b_puback">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="120" y="770"/><mxPoint x="120" y="1260"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="conv2" style="endArrow=block;strokeColor=#0288d1;dashed=1;" edge="1" parent="sw_broker" source="q01" target="b_puback">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="420" y="770"/><mxPoint x="420" y="1260"/></Array></mxGeometry>
+        </mxCell>
+
+        <!-- retry edges -->
+        <mxCell id="re1" style="endArrow=block;strokeColor=#c62828;" edge="1" parent="sw_broker" source="r01" target="r_dec"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re2" value="Да" style="endArrow=block;strokeColor=#f9a825;" edge="1" parent="sw_broker" source="r_dec" target="r_yes">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="80" y="1620"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="re3" value="Нет" style="endArrow=block;strokeColor=#b85450;" edge="1" parent="sw_broker" source="r_dec" target="r_no">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="420" y="1620"/></Array></mxGeometry>
+        </mxCell>
+
+        <!-- ═══════════════ SWIMLANE: SUBSCRIBER ═══════════════ -->
+        <mxCell id="sw_sub" value="Subscriber (Java SDK)" style="shape=swimlane;startSize=25;fillColor=#e8eaf6;strokeColor=#5c6bc0;fontStyle=1;fontSize=12;horizontal=1;" vertex="1" parent="1">
+          <mxGeometry x="970" y="70" width="300" height="2300" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s01" value="Запуск SDK&#10;PigeonClient.connect(host, port)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c5cae9;strokeColor=#3949ab;" vertex="1" parent="sw_sub">
+          <mxGeometry x="30" y="40" width="230" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="s02" value="MQTT CONNECT → broker&#10;CONNACK ← broker" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c5cae9;strokeColor=#3949ab;" vertex="1" parent="sw_sub">
+          <mxGeometry x="30" y="110" width="230" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="s03" value="MQTT SUBSCRIBE&#10;Topic: filter=&quot;orders&quot;&#10;Queue: filter=&#10;&quot;$share/tasks_group/tasks&quot;&#10;QoS = 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c5cae9;strokeColor=#3949ab;align=left;spacingLeft=8;" vertex="1" parent="sw_sub">
+          <mxGeometry x="20" y="190" width="250" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="s04" value="SUBACK ← broker&#10;(grantedQos = 1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;" vertex="1" parent="sw_sub">
+          <mxGeometry x="30" y="300" width="230" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="s05" value="Ожидание сообщений...&#10;(event loop / callback)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#5c6bc0;" vertex="1" parent="sw_sub">
+          <mxGeometry x="30" y="380" width="230" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="s06" value="← Inbound PUBLISH (QoS 1)&#10;от Delivery Manager&#10;topic, payload, packetId=99" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f9a825;" vertex="1" parent="sw_sub">
+          <mxGeometry x="20" y="860" width="250" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="s07" value="Бизнес-обработка&#10;сообщения&#10;(пользовательский код)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#5c6bc0;" vertex="1" parent="sw_sub">
+          <mxGeometry x="30" y="960" width="230" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="s08" value="PUBACK → broker&#10;(packetId=99)&#10;= application ACK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#388e3c;" vertex="1" parent="sw_sub">
+          <mxGeometry x="30" y="1045" width="230" height="55" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="s09" value="Если НЕТ PUBACK в течение&#10;ack_deadline (30s):&#10;→ broker считает timeout&#10;→ Retry Worker подхватит" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=10;" vertex="1" parent="sw_sub">
+          <mxGeometry x="30" y="1130" width="230" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- subscriber internal edges -->
+        <mxCell id="se1" style="endArrow=block;strokeColor=#3949ab;" edge="1" parent="sw_sub" source="s01" target="s02"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se2" style="endArrow=block;strokeColor=#3949ab;" edge="1" parent="sw_sub" source="s02" target="s03"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se3" style="endArrow=block;strokeColor=#2e7d32;" edge="1" parent="sw_sub" source="s03" target="s04"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se4" style="endArrow=block;strokeColor=#5c6bc0;" edge="1" parent="sw_sub" source="s04" target="s05"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se5" style="endArrow=block;strokeColor=#f9a825;" edge="1" parent="sw_sub" source="s06" target="s07"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se6" style="endArrow=block;strokeColor=#388e3c;" edge="1" parent="sw_sub" source="s07" target="s08"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="se7" style="endArrow=block;strokeColor=#c62828;dashed=1;" edge="1" parent="sw_sub" source="s08" target="s09"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ═══════════════ SWIMLANE: PostgreSQL ═══════════════ -->
+        <mxCell id="sw_pg" value="PostgreSQL" style="shape=swimlane;startSize=25;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=12;horizontal=1;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="70" width="340" height="2300" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pg01" value="subscriptions&#10;INSERT (client_id, dest_type,&#10;destination_name,&#10;consumer_offset=0)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#d6b656;size=10;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_pg">
+          <mxGeometry x="30" y="190" width="280" height="70" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pg02_t" value="TOPIC PUBLISH:&#10;topics.next_offset++&#10;INSERT topic_messages&#10;(offset, msg_id, payload,&#10; headers, priority, expires_at)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;size=10;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_pg">
+          <mxGeometry x="30" y="630" width="280" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="pg02_q" value="QUEUE PUBLISH:&#10;queues.next_offset++&#10;INSERT queue_messages&#10;(offset, msg_id, payload,&#10; priority, headers, expires_at)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;size=10;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_pg">
+          <mxGeometry x="30" y="750" width="280" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pg03_claim" value="QUEUE CLAIM:&#10;SELECT ... FOR UPDATE SKIP LOCKED&#10;INSERT queue_delivery_state&#10;(state='INFLIGHT',&#10; ack_deadline = now() + 30s)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#e65100;size=10;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_pg">
+          <mxGeometry x="30" y="870" width="280" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pg04_ack" value="ACK (Queue):&#10;UPDATE queue_delivery_state&#10;SET state = 'ACKED'&#10;&#10;ACK (Topic):&#10;UPDATE subscriptions&#10;SET consumer_offset = offset" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;size=10;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_pg">
+          <mxGeometry x="30" y="1030" width="280" height="110" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pg05_retry" value="RETRY:&#10;DELETE queue_delivery_state&#10;WHERE message_id = ?&#10;(сообщение снова «READY» для claim)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;size=10;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_pg">
+          <mxGeometry x="30" y="1640" width="280" height="80" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pg06_dlq" value="DLQ:&#10;INSERT dlq_messages&#10;(message_id, dest_type,&#10; destination_name, payload,&#10; retry_count, reason)&#10;DELETE queue_delivery_state" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;size=10;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_pg">
+          <mxGeometry x="30" y="1760" width="280" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pg07_ttl" value="TTL CLEANUP:&#10;DELETE FROM topic_messages&#10;WHERE expires_at &lt;= now()&#10;DELETE FROM queue_messages&#10;WHERE expires_at &lt;= now()&#10;AND NOT INFLIGHT" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#e65100;size=10;align=left;spacingLeft=8;fontSize=10;" vertex="1" parent="sw_pg">
+          <mxGeometry x="30" y="1900" width="280" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════ CROSS-LANE EDGES ═══════════════ -->
+
+        <!-- Publisher → Broker: PUBLISH -->
+        <mxCell id="x_pub" value="MQTT PUBLISH" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#1565c0;" edge="1" parent="1" source="p05" target="b_recv_pub">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Broker → Publisher: PUBACK -->
+        <mxCell id="x_puback" value="PUBACK" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#388e3c;dashed=1;" edge="1" parent="1" source="b_puback" target="p06">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Broker → PostgreSQL: topic publish -->
+        <mxCell id="x_pg_tpub" value="INSERT" style="endArrow=block;html=1;strokeWidth=1;strokeColor=#2e7d32;" edge="1" parent="1" source="t01" target="pg02_t">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Broker → PostgreSQL: queue publish -->
+        <mxCell id="x_pg_qpub" value="INSERT" style="endArrow=block;html=1;strokeWidth=1;strokeColor=#2e7d32;" edge="1" parent="1" source="q01" target="pg02_q">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Broker → PostgreSQL: claim -->
+        <mxCell id="x_pg_claim" value="CLAIM" style="endArrow=block;html=1;strokeWidth=1;strokeColor=#e65100;" edge="1" parent="1" source="q03" target="pg03_claim">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Broker → PostgreSQL: ack -->
+        <mxCell id="x_pg_ack" value="ACK" style="endArrow=block;html=1;strokeWidth=1;strokeColor=#2e7d32;" edge="1" parent="1" source="t04" target="pg04_ack">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Broker delivery → Subscriber -->
+        <mxCell id="x_deliver" value="outbound PUBLISH" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#f9a825;" edge="1" parent="1" source="t03" target="s06">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Subscriber → Broker: PUBACK (ACK) -->
+        <mxCell id="x_sub_ack" value="PUBACK (ACK)" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#388e3c;dashed=1;" edge="1" parent="1" source="s08" target="t04">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Broker → PostgreSQL: retry -->
+        <mxCell id="x_pg_retry" value="RETRY" style="endArrow=block;html=1;strokeWidth=1;strokeColor=#c62828;" edge="1" parent="1" source="r_yes" target="pg05_retry">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Broker → PostgreSQL: DLQ -->
+        <mxCell id="x_pg_dlq" value="DLQ" style="endArrow=block;html=1;strokeWidth=1;strokeColor=#b85450;" edge="1" parent="1" source="r_no" target="pg06_dlq">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Broker → PostgreSQL: TTL cleanup -->
+        <mxCell id="x_pg_ttl" value="DELETE expired" style="endArrow=block;html=1;strokeWidth=1;strokeColor=#e65100;" edge="1" parent="1" source="ttl01" target="pg07_ttl">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Broker → PostgreSQL: subscription registration -->
+        <mxCell id="x_pg_sub" value="INSERT subscription" style="endArrow=block;html=1;strokeWidth=1;strokeColor=#d6b656;" edge="1" parent="1" source="b03" target="pg01">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ═══════════════ LEGEND ═══════════════ -->
+        <mxCell id="legend" value="" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;container=1;" vertex="1" parent="1">
+          <mxGeometry x="1680" y="70" width="240" height="260" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg_title" value="Легенда" style="text;html=1;fontStyle=1;fontSize=12;" vertex="1" parent="legend">
+          <mxGeometry x="5" y="5" width="100" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=1;fillColor=#e1f5fe;strokeColor=#0288d1;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="35" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1t" value="MQTT transport" style="text;html=1;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="35" y="33" width="160" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;fillColor=#c8e6c9;strokeColor=#2e7d32;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="60" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2t" value="Broker Core / commit" style="text;html=1;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="35" y="58" width="160" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=1;fillColor=#fff9c4;strokeColor=#f9a825;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="85" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3t" value="Routing / delivery" style="text;html=1;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="35" y="83" width="160" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=1;fillColor=#ffe0b2;strokeColor=#e65100;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="110" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4t" value="INFLIGHT / claim / TTL" style="text;html=1;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="35" y="108" width="160" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5" value="" style="rounded=1;fillColor=#ffcdd2;strokeColor=#c62828;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="135" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5t" value="Retry / timeout" style="text;html=1;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="35" y="133" width="160" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6" value="" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="legend">
+          <mxGeometry x="10" y="160" width="20" height="15" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6t" value="DLQ (Dead Letter Queue)" style="text;html=1;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="35" y="158" width="160" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg7" value="" style="endArrow=block;strokeWidth=2;strokeColor=#1565c0;" edge="1" parent="legend">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="10" y="195" as="sourcePoint"/><mxPoint x="30" y="195" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="leg7t" value="Сплошная → request" style="text;html=1;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="35" y="185" width="160" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg8" value="" style="endArrow=block;strokeWidth=2;strokeColor=#388e3c;dashed=1;" edge="1" parent="legend">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="10" y="220" as="sourcePoint"/><mxPoint x="30" y="220" as="targetPoint"/></mxGeometry>
+        </mxCell>
+        <mxCell id="leg8t" value="Пунктир → response" style="text;html=1;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry x="35" y="210" width="160" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,57 @@
+### Health
+GET http://localhost:8080/health
+Accept: application/json
+
+###
+### Create topic
+POST http://localhost:8080/api/topics
+Content-Type: application/json
+Accept: application/json
+
+{"name":"orders"}
+
+###
+### List topics
+GET http://localhost:8080/api/topics
+Accept: application/json
+
+###
+### Topic details
+GET http://localhost:8080/api/topics/orders
+Accept: application/json
+
+###
+### Delete topic
+DELETE http://localhost:8080/api/topics/orders
+Accept: application/json
+
+###
+### Create queue (FIFO)
+POST http://localhost:8080/api/queues
+Content-Type: application/json
+Accept: application/json
+
+{"name":"tasks","mode":"FIFO"}
+
+###
+### Create queue (PRIORITY)
+POST http://localhost:8080/api/queues
+Content-Type: application/json
+Accept: application/json
+
+{"name":"tasks_priority","mode":"PRIORITY"}
+
+###
+### List queues
+GET http://localhost:8080/api/queues
+Accept: application/json
+
+###
+### Queue details
+GET http://localhost:8080/api/queues/tasks
+Accept: application/json
+
+###
+### Delete queue
+DELETE http://localhost:8080/api/queues/tasks
+Accept: application/json

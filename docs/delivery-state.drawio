@@ -1,0 +1,88 @@
+<mxfile host="app.diagrams.net" modified="2026-03-23T00:00:00.000Z" agent="pigeonMQ-ai" version="22.1.3" type="device">
+  <diagram id="delivery-state" name="pigeonMQ — Delivery State (PostgreSQL)">
+    <mxGraphModel dx="1100" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Tables / actors -->
+        <mxCell id="t1" value="queue_messages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="t2" value="queue_delivery_state&#10;(READY/INFLIGHT/ACKED)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="150" width="240" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="t3" value="topic_messages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="240" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="t4" value="topic_delivery_state&#10;(INFLIGHT/ACKED per subscriber)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="310" width="280" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="t5" value="dlq_messages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="40" y="410" width="180" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Delivery engine -->
+        <mxCell id="d1" value="Delivery/Retry worker&#10;1) claim READY 2) send MESSAGE&#10;3) check ack_deadline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="340" y="120" width="340" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="d2" value="Subscriber side&#10;handles payload &gt; calls application ACK&#10;(or does not ACK)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="720" y="120" width="280" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- State boxes -->
+        <mxCell id="s_ready" value="READY" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dff0d8;strokeColor=#3c763d;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="520" y="310" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_inflight" value="INFLIGHT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3cd;strokeColor=#d39e00;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="690" y="310" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_acked" value="ACKED / offset advanced" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d0e9ff;strokeColor=#1e5aa8;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="450" y="390" width="240" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="s_dlq" value="DLQ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="720" y="390" width="110" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: claim / send -->
+        <mxCell id="e1" value="claim&#10;(FOR UPDATE SKIP LOCKED)" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#3c763d;" edge="1" parent="1" source="t2" target="s_inflight">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="send MESSAGE (QoS/flow)" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#d39e00;" edge="1" parent="1" source="s_inflight" target="d2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ACK -->
+        <mxCell id="e3" value="application ACK&#10;update state + consumer_offset" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#1e5aa8;" edge="1" parent="1" source="d2" target="s_acked">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" value="INFLIGHT → ACKED" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#1e5aa8;" edge="1" parent="1" source="s_inflight" target="s_acked">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- NACK / timeout -->
+        <mxCell id="e5" value="no ACK до ack_deadline&#10;retry++ / requeue" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#d39e00;" edge="1" parent="1" source="s_inflight" target="s_ready">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- DLQ -->
+        <mxCell id="e6" value="max_retries reached&#10;READY/INFLIGHT → DLQ" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="1" source="s_inflight" target="s_dlq">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" value="insert into dlq_messages" style="endArrow=block;html=1;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="1" source="s_dlq" target="t5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- State tracking links -->
+        <mxCell id="e8" value="queue claim/updates" style="endArrow=none;html=1;strokeWidth=1;strokeColor=#b6a200;" edge="1" parent="1" source="d1" target="t2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" value="topic in-flight (per subscriber)" style="endArrow=none;html=1;strokeWidth=1;strokeColor=#b6a200;" edge="1" parent="1" source="d1" target="t4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+
