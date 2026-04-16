@@ -1,5 +1,0 @@
-target/
-.idea/
-
-# Local env files (keep .env.example committed)
-.env
