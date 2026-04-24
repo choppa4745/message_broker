@@ -2,9 +2,12 @@ package com.pigeonmq.service;
 
 import com.pigeonmq.config.BrokerProperties;
 import com.pigeonmq.domain.*;
+import com.pigeonmq.persistence.entity.MessageStatus;
+import com.pigeonmq.persistence.repository.MessageRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -22,6 +25,8 @@ public class DeliveryService {
     private final QueueService queueService;
     private final SessionService sessionService;
     private final BrokerProperties properties;
+    private final MessageRepository messageRepository;
+    private final TransactionTemplate transactionTemplate;
 
     private final Map<String, AtomicInteger> queueRoundRobin = new ConcurrentHashMap<>();
 
@@ -30,11 +35,15 @@ public class DeliveryService {
     public DeliveryService(TopicService topicService,
                            QueueService queueService,
                            SessionService sessionService,
-                           BrokerProperties properties) {
+                           BrokerProperties properties,
+                           MessageRepository messageRepository,
+                           TransactionTemplate transactionTemplate) {
         this.topicService = topicService;
         this.queueService = queueService;
         this.sessionService = sessionService;
         this.properties = properties;
+        this.messageRepository = messageRepository;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @PostConstruct
@@ -85,7 +94,7 @@ public class DeliveryService {
                 .toList();
 
         if (subscribers.isEmpty()) return;
-        deliverNextQueueMessage(queue, subscribers);
+        transactionTemplate.executeWithoutResult(tx -> deliverNextQueueMessage(queue, subscribers));
     }
 
     // ── Periodic sweep ─────────────────────────────────────────────────
@@ -124,6 +133,8 @@ public class DeliveryService {
     private void deliverNextQueueMessage(QueueStore queue, List<ClientSession> subscribers) {
         Message msg = queue.claim();
         if (msg == null) return;
+
+        messageRepository.updateStatus(msg.id(), MessageStatus.INFLIGHT);
 
         ClientSession target = pickNextSubscriber(queue.getName(), subscribers);
         int packetId = target.nextPacketId();

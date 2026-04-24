@@ -44,6 +44,11 @@ public class QueueStore {
         return offset;
     }
 
+    public void restoreReady(Message messageWithOffset) {
+        readyMessages.offer(messageWithOffset);
+        nextOffset.updateAndGet(curr -> Math.max(curr, messageWithOffset.offset() + 1));
+    }
+
     public synchronized Message claim() {
         Message msg = readyMessages.poll();
         if (msg != null) {

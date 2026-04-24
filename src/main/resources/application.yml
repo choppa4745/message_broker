@@ -1,6 +1,18 @@
 server:
   port: ${PIGEONMQ_HTTP_PORT:8080}
 
+spring:
+  datasource:
+    url: ${PIGEONMQ_DB_URL:jdbc:postgresql://localhost:5432/pigeonmq}
+    username: ${POSTGRES_USER:pigeonmq}
+    password: ${POSTGRES_PASSWORD:pigeonmq}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
 pigeonmq:
   mqtt-port: ${PIGEONMQ_MQTT_PORT:1883}
   delivery-interval-ms: ${PIGEONMQ_DELIVERY_INTERVAL_MS:100}

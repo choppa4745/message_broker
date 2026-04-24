@@ -30,6 +30,12 @@ public class TopicStore {
         return offset;
     }
 
+    public void restore(Message messageWithOffset) {
+        long offset = messageWithOffset.offset();
+        messages.put(offset, messageWithOffset);
+        nextOffset.updateAndGet(curr -> Math.max(curr, offset + 1));
+    }
+
     public List<Message> getMessagesFrom(long fromOffset) {
         return new ArrayList<>(messages.tailMap(fromOffset).values());
     }

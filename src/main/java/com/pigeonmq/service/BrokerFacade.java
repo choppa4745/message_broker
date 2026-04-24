@@ -1,6 +1,7 @@
 package com.pigeonmq.service;
 
 import com.pigeonmq.domain.*;
+import com.pigeonmq.persistence.repository.DestinationRepository;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,15 +17,18 @@ public class BrokerFacade {
     private final QueueService queueService;
     private final SessionService sessionService;
     private final DeliveryService deliveryService;
+    private final DestinationRepository destinationRepository;
 
     public BrokerFacade(TopicService topicService,
                         QueueService queueService,
                         SessionService sessionService,
-                        DeliveryService deliveryService) {
+                        DeliveryService deliveryService,
+                        DestinationRepository destinationRepository) {
         this.topicService = topicService;
         this.queueService = queueService;
         this.sessionService = sessionService;
         this.deliveryService = deliveryService;
+        this.destinationRepository = destinationRepository;
     }
 
     // ── Client lifecycle ───────────────────────────────────────────────
@@ -111,7 +115,9 @@ public class BrokerFacade {
     // ── Internal helpers ───────────────────────────────────────────────
 
     private DestinationType resolveDestinationType(String destination) {
-        return queueService.exists(destination) ? DestinationType.QUEUE : DestinationType.TOPIC;
+        return destinationRepository.findById(destination)
+                .map(d -> d.getType())
+                .orElseGet(() -> queueService.exists(destination) ? DestinationType.QUEUE : DestinationType.TOPIC);
     }
 
     private ParsedSubscription parseTopicFilter(String filter) {

@@ -40,6 +40,15 @@ public class ClientSession {
         topicSentOffsets.putIfAbsent(topicName, 0L);
     }
 
+    public void restoreTopicSentOffsets(Map<String, Long> offsets) {
+        if (offsets == null || offsets.isEmpty()) return;
+        offsets.forEach((topic, offset) -> {
+            if (topic == null || topic.isBlank()) return;
+            if (offset == null) return;
+            topicSentOffsets.merge(topic, offset, Math::max);
+        });
+    }
+
     public void subscribeQueue(String queueName) {
         subscribedQueues.add(queueName);
     }

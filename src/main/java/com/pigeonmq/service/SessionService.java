@@ -1,6 +1,7 @@
 package com.pigeonmq.service;
 
 import com.pigeonmq.domain.ClientSession;
+import com.pigeonmq.persistence.repository.ConsumerOffsetRepository;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -17,6 +19,11 @@ public class SessionService {
     private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
     private final ConcurrentMap<String, ClientSession> sessions = new ConcurrentHashMap<>();
+    private final ConsumerOffsetRepository consumerOffsetRepository;
+
+    public SessionService(ConsumerOffsetRepository consumerOffsetRepository) {
+        this.consumerOffsetRepository = consumerOffsetRepository;
+    }
 
     public ClientSession register(String clientId, Channel channel) {
         ClientSession existing = sessions.get(clientId);
@@ -25,6 +32,13 @@ public class SessionService {
             existing.getChannel().close();
         }
         ClientSession session = new ClientSession(clientId, channel);
+        Map<String, Long> offsets = consumerOffsetRepository.findByIdClientId(clientId).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        e -> e.getId().getTopicName(),
+                        e -> e.getSentOffset(),
+                        Math::max
+                ));
+        session.restoreTopicSentOffsets(offsets);
         sessions.put(clientId, session);
         log.info("Client connected: {}", clientId);
         return session;
