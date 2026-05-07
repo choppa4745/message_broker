@@ -1,0 +1,13 @@
+FROM maven:3.9.11-eclipse-temurin-17 AS build
+WORKDIR /work
+COPY pom.xml pom.xml
+COPY application/pom.xml application/pom.xml
+COPY load-generator/pom.xml load-generator/pom.xml
+COPY load-generator/src load-generator/src
+RUN mvn -q -pl load-generator -am package -DskipTests
+
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /work/load-generator/target/*.jar /app/loadgen.jar
+ENTRYPOINT ["java","-jar","/app/loadgen.jar"]
+
