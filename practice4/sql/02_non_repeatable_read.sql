@@ -1,0 +1,37 @@
+-- ============================================================================
+-- Аномалия: NON-REPEATABLE READ (неповторяемое чтение)
+-- Уровень изоляции по умолчанию в PostgreSQL: READ COMMITTED
+-- ============================================================================
+--
+-- Подготовка: выполните из каталога practice4/sql:
+--   psql "postgresql://lab_user:lab_pass@localhost:5441/isolation_lab" -f 01_schema_and_seed.sql
+--
+-- Нужны ДВА терминала (два клиента psql): «Сессия A» и «Сессия B».
+--
+-- --- Сессия A ---
+-- BEGIN;
+-- SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+-- SELECT balance FROM accounts WHERE id = 1;
+--   -- запомните значение (например 1000.00)
+-- -- НЕ коммитьте. Перейдите в Сессию B.
+--
+-- --- Сессия B ---
+-- BEGIN;
+-- UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+-- SELECT balance FROM accounts WHERE id = 1;
+-- COMMIT;
+--
+-- --- Снова Сессия A ---
+-- SELECT balance FROM accounts WHERE id = 1;
+--   -- значение изменилось по сравнению с первым SELECT в той же транзакции!
+-- COMMIT;
+--
+-- Ожидаемый результат: два SELECT внутри одной транзакции A дали разные строки
+-- после коммита B — типичный non-repeatable read при READ COMMITTED.
+--
+-- Как избежать: REPEATABLE READ или SERIALIZABLE; или явная блокировка строки
+-- (SELECT ... FOR SHARE/FOR UPDATE) на первом чтении в транзакции A.
+-- ============================================================================
+
+-- Проверочный запрос после демо (выполнить в новом подключении):
+SELECT id, name, balance FROM accounts WHERE id = 1;
