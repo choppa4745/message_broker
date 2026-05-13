@@ -1,0 +1,168 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: practice3-postgres
+    environment:
+      POSTGRES_DB: cache_practice
+      POSTGRES_USER: cache_user
+      POSTGRES_PASSWORD: cache_pass
+    ports:
+      - "5440:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cache_user -d cache_practice"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: practice3-redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy noeviction --save ""
+    ports:
+      - "6385:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  app-cache-aside:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: practice3-app-cache-aside
+    environment:
+      SPRING_PROFILES_ACTIVE: cache-aside
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cache_practice
+      DB_USER: cache_user
+      DB_PASS: cache_pass
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATASET_SIZE: 10000
+      CACHE_TTL_SECONDS: 60
+    ports:
+      - "8086:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  app-write-through:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: practice3-app-write-through
+    environment:
+      SPRING_PROFILES_ACTIVE: write-through
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cache_practice
+      DB_USER: cache_user
+      DB_PASS: cache_pass
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATASET_SIZE: 10000
+      CACHE_TTL_SECONDS: 60
+    ports:
+      - "8087:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  app-write-back:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: practice3-app-write-back
+    environment:
+      SPRING_PROFILES_ACTIVE: write-back
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cache_practice
+      DB_USER: cache_user
+      DB_PASS: cache_pass
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATASET_SIZE: 10000
+      CACHE_TTL_SECONDS: 60
+      WRITEBACK_FLUSH_INTERVAL_MS: 500
+      WRITEBACK_FLUSH_BATCH_SIZE: 200
+    ports:
+      - "8088:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  loadgen:
+    build:
+      context: .
+      dockerfile: Dockerfile.loadgen
+    container_name: practice3-loadgen
+    environment:
+      RESULTS_DIR: /results
+      DATASET_SIZE: 10000
+      DURATION_SECONDS: 30
+      CONCURRENCY: 32
+      WARMUP_SECONDS: 5
+      RANDOM_SEED: 42
+      TARGETS: >-
+        cache-aside=http://app-cache-aside:8080,
+        write-through=http://app-write-through:8080,
+        write-back=http://app-write-back:8080
+    volumes:
+      - ./results:/results
+    depends_on:
+      app-cache-aside:
+        condition: service_healthy
+      app-write-through:
+        condition: service_healthy
+      app-write-back:
+        condition: service_healthy
+

@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: practice3-application
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:cache_practice}
+    username: ${DB_USER:cache_user}
+    password: ${DB_PASS:cache_pass}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+
+practice3:
+  dataset:
+    size: ${DATASET_SIZE:10000}
+  cache:
+    ttlSeconds: ${CACHE_TTL_SECONDS:60}
+  writeBack:
+    flushIntervalMs: ${WRITEBACK_FLUSH_INTERVAL_MS:500}
+    flushBatchSize: ${WRITEBACK_FLUSH_BATCH_SIZE:200}
+
