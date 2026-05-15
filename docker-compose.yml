@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   broker:
-    build: .
+    build: ./broker
     container_name: pigeonmq-broker
     ports:
       - "1883:1883"

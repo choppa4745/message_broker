@@ -7,6 +7,6 @@ RUN mvn package -DskipTests -q
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-COPY --from=build /app/target/pigeonmq-*.jar /app/pigeonmq.jar
+COPY --from=build /app/target/pigeonmq.jar /app/pigeonmq.jar
 EXPOSE 1883 8080
 ENTRYPOINT ["java", "-jar", "pigeonmq.jar"]

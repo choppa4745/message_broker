@@ -1,4 +1,6 @@
 target/
+broker/target/
+sdk/target/
 .idea/
 
 # Local env files (keep .env.example committed)
