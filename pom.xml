@@ -22,6 +22,7 @@
     <modules>
         <module>broker</module>
         <module>sdk</module>
+        <module>examples/sdk-demo</module>
     </modules>
 
     <properties>
