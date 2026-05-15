@@ -1,8 +1,8 @@
-version: "3.8"
-
 services:
   broker:
-    build: ./broker
+    build:
+      context: .
+      dockerfile: broker/Dockerfile
     container_name: pigeonmq-broker
     ports:
       - "1883:1883"

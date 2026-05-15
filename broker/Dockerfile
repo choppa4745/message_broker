@@ -1,12 +1,13 @@
 FROM maven:3.9-eclipse-temurin-17 AS build
-WORKDIR /app
+WORKDIR /workspace
 COPY pom.xml .
-RUN mvn dependency:go-offline -q
-COPY src ./src
-RUN mvn package -DskipTests -q
+COPY broker/pom.xml broker/pom.xml
+COPY sdk/pom.xml sdk/pom.xml
+COPY broker/src broker/src
+RUN mvn -q -pl broker -am -DskipTests package
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-COPY --from=build /app/target/pigeonmq.jar /app/pigeonmq.jar
+COPY --from=build /workspace/broker/target/pigeonmq.jar /app/pigeonmq.jar
 EXPOSE 1883 8080
 ENTRYPOINT ["java", "-jar", "pigeonmq.jar"]
